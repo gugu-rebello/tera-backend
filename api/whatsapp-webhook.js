@@ -9,11 +9,11 @@ export default async function handler(req, res) {
 
   console.log('whatsapp in:', from, 'msg:', body);
 
-  const cleanNumber = from.replace('whatsapp:', '').replace(/\D/g, '');
+  const userPhone = from.replace('whatsapp:', '').replace(/\D/g, '');
 
   const baseUrl = process.env.WEBVIEW_BASE_URL || 'https://gugu-rebello.github.io/qrtera-demo';
-  const botNumber = process.env.WHATSAPP_BOT_NUMBER || cleanNumber;
-  const webviewLink = baseUrl + '/?wa=' + botNumber + '&t=' + Date.now();
+  const botNumber = process.env.WHATSAPP_BOT_NUMBER || '14155238886';
+  const webviewLink = baseUrl + '/?wa=' + botNumber + '&u=' + userPhone + '&t=' + Date.now();
 
   const reply = [
     'Oi ' + profileName.split(' ')[0] + '! 👋',

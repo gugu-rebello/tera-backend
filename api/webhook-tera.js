@@ -3,14 +3,26 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'method not allowed' });
   }
 
-  const expectedToken = process.env.TERA_WEBHOOK_TOKEN;
-  if (expectedToken) {
-    const authHeader = req.headers['authentication'] || req.headers['authorization'];
-    const sentToken = authHeader && authHeader.replace(/^Bearer\s+/i, '');
-    if (sentToken !== expectedToken) {
-      console.warn('webhook tera com token invalido');
-      return res.status(401).json({ error: 'unauthorized' });
-    }
+  const expectedToken = (process.env.TERA_WEBHOOK_TOKEN || '').trim();
+
+  const authHeader = req.headers['authentication'] || req.headers['authorization'] || '';
+  const sentToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+  console.log('webhook tera headers:', JSON.stringify({
+    hasExpectedToken: !!expectedToken,
+    expectedTokenLength: expectedToken.length,
+    expectedTokenFirst: expectedToken.substring(0, 4),
+    expectedTokenLast: expectedToken.substring(expectedToken.length - 4),
+    receivedAuthHeader: authHeader ? authHeader.substring(0, 20) + '...' : '(empty)',
+    sentTokenLength: sentToken.length,
+    sentTokenFirst: sentToken.substring(0, 4),
+    sentTokenLast: sentToken.substring(sentToken.length - 4),
+    match: sentToken === expectedToken
+  }));
+
+  if (expectedToken && sentToken !== expectedToken) {
+    console.warn('webhook tera com token invalido');
+    return res.status(401).json({ error: 'unauthorized' });
   }
 
   const { eventType, eventData } = req.body || {};

@@ -1,0 +1,6 @@
+{
+  "name": "tera-backend",
+  "version": "1.0.0",
+  "description": "Backend proxy para a API da Tera",
+  "private": true
+}

@@ -25,9 +25,7 @@ export default async function handler(req, res) {
     '2. Aponte a câmera pro QR code da sua nota fiscal',
     '3. Pronto!',
     '',
-    '👉 ' + webviewLink,
-    '',
-    'Se preferir, é só responder com a chave de acesso de 44 dígitos da nota.'
+    '👉 ' + webviewLink
   ].join('\n');
 
   await sendWhatsApp(from, reply);

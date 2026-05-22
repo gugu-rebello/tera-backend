@@ -11,6 +11,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'method not allowed' });
   }
 
+  console.log('submit-chave body recebido:', JSON.stringify(req.body));
+
   const { chaveAcesso, urlQrCode, meta } = req.body || {};
 
   if (!chaveAcesso && !urlQrCode) {
@@ -60,6 +62,14 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'resposta vazia da tera' });
     }
 
+    console.log('debug confirmacao:', JSON.stringify({
+      temMeta: !!meta,
+      temWa: !!(meta && meta.wa),
+      wa: meta && meta.wa,
+      status: firstResult.status,
+      condicaoCompleta: !!(meta && meta.wa && (firstResult.status === 'RECEIVED' || firstResult.status === 'DUPLICATED'))
+    }));
+
     if (meta && meta.wa && (firstResult.status === 'RECEIVED' || firstResult.status === 'DUPLICATED')) {
       let msg = '';
       if (firstResult.status === 'DUPLICATED') {
@@ -67,9 +77,12 @@ export default async function handler(req, res) {
       } else {
         msg = '📥 *Nota recebida!*\n\nEstamos validando sua nota fiscal. Em alguns minutos te aviso aqui se sua participação foi confirmada. 🎯';
       }
+      console.log('tentando enviar wa para:', meta.wa);
       sendWhatsApp('whatsapp:+' + meta.wa, msg).catch(function(err) {
         console.error('erro ao mandar wa de confirmacao imediata:', err.message);
       });
+    } else {
+      console.log('NAO disparou wa: condicao falhou');
     }
 
     return res.status(200).json({
@@ -89,6 +102,13 @@ async function sendWhatsApp(to, body) {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const fromNumber = process.env.TWILIO_WHATSAPP_FROM;
+
+  console.log('sendWhatsApp config:', JSON.stringify({
+    hasSid: !!sid,
+    hasToken: !!token,
+    hasFromNumber: !!fromNumber,
+    fromNumber: fromNumber
+  }));
 
   if (!sid || !token || !fromNumber) {
     console.error('twilio config ausente no submit-chave');
@@ -111,5 +131,6 @@ async function sendWhatsApp(to, body) {
     },
     body: params.toString()
   });
-  console.log('twilio send (submit):', resp.status);
+  const respData = await resp.text();
+  console.log('twilio send (submit):', resp.status, respData.substring(0, 300));
 }

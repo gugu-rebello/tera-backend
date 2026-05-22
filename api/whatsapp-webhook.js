@@ -1,74 +1,38 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'method not allowed' });
+    return res.status(405).send('method not allowed');
   }
 
-  const expectedToken = process.env.TERA_WEBHOOK_TOKEN;
-  if (expectedToken) {
-    const authHeader = req.headers['authentication'] || req.headers['authorization'];
-    const sentToken = authHeader && authHeader.replace(/^Bearer\s+/i, '');
-    if (sentToken !== expectedToken) {
-      console.warn('webhook tera com token invalido');
-      return res.status(401).json({ error: 'unauthorized' });
-    }
-  }
+  const from = req.body.From || '';
+  const body = (req.body.Body || '').trim();
+  const profileName = req.body.ProfileName || 'amigo';
 
-  const { eventType, eventData } = req.body || {};
-  console.log('webhook tera:', eventType, JSON.stringify(eventData));
+  console.log('whatsapp in:', from, 'msg:', body);
 
-  if (eventType === 'RECEIPT_STATUS_UPDATED') {
-    const accessKey = eventData && eventData.accessKey;
-    const status = eventData && eventData.status;
+  const cleanNumber = from.replace('whatsapp:', '').replace(/\D/g, '');
 
-    if (status === 'OK' && accessKey) {
-      await consultarEAvisar(accessKey);
-    } else if (status === 'INVALID') {
-      console.log('nota invalida:', accessKey);
-    }
-  }
+  const baseUrl = process.env.WEBVIEW_BASE_URL || 'https://gugu-rebello.github.io/qrtera-demo';
+  const botNumber = process.env.WHATSAPP_BOT_NUMBER || cleanNumber;
+  const webviewLink = baseUrl + '/?wa=' + botNumber + '&t=' + Date.now();
 
-  return res.status(200).json({ received: true });
-}
+  const reply = [
+    'Oi ' + profileName.split(' ')[0] + '! 👋',
+    '',
+    'Bem-vindo à *Promoção Demo Tera*.',
+    '',
+    'Pra participar, é simples:',
+    '1. Clique no link abaixo',
+    '2. Aponte a câmera pro QR code da sua nota fiscal',
+    '3. Pronto!',
+    '',
+    '👉 ' + webviewLink,
+    '',
+    'Se preferir, é só responder com a chave de acesso de 44 dígitos da nota.'
+  ].join('\n');
 
-async function consultarEAvisar(accessKey) {
-  const teraToken = process.env.TERA_API_TOKEN;
-  if (!teraToken) {
-    console.error('TERA_API_TOKEN ausente');
-    return;
-  }
+  await sendWhatsApp(from, reply);
 
-  try {
-    const cleanToken = teraToken.trim().replace(/^Bearer\s+/i, '');
-    const teraResp = await fetch('https://api.terabr.com/v1/receipt/' + accessKey, {
-      headers: { 'Authorization': 'Bearer ' + cleanToken }
-    });
-    const data = await teraResp.json();
-
-    if (data.status !== 'OK' || !data.meta || !data.meta.wa) {
-      console.log('nota sem wa no meta, ignora:', accessKey);
-      return;
-    }
-
-    const wa = data.meta.wa;
-    const receipt = data.receipt || {};
-    const empresa = receipt.companyTradeName || receipt.companyName || 'estabelecimento';
-    const valor = receipt.totalValue ? receipt.totalValue.toFixed(2).replace('.', ',') : null;
-
-    let msg = '✅ *Sua participação foi confirmada!*\n\n';
-    msg += 'Nota validada com sucesso 🎉\n\n';
-    if (empresa && empresa !== 'estabelecimento') {
-      msg += '🏪 ' + empresa + '\n';
-    }
-    if (valor) {
-      msg += '💰 R$ ' + valor + '\n';
-    }
-    msg += '\nObrigado por participar da promoção!';
-
-    await sendWhatsApp('whatsapp:+' + wa, msg);
-
-  } catch (err) {
-    console.error('erro ao consultar nota:', err.message);
-  }
+  return res.status(200).send('<Response></Response>');
 }
 
 async function sendWhatsApp(to, body) {
@@ -98,7 +62,8 @@ async function sendWhatsApp(to, body) {
       },
       body: params.toString()
     });
-    console.log('twilio send:', resp.status);
+    const data = await resp.json();
+    console.log('twilio response:', resp.status, JSON.stringify(data).substring(0, 200));
   } catch (err) {
     console.error('erro twilio:', err.message);
   }

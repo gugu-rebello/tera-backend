@@ -60,6 +60,18 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'resposta vazia da tera' });
     }
 
+    if (meta && meta.wa && (firstResult.status === 'RECEIVED' || firstResult.status === 'DUPLICATED')) {
+      let msg = '';
+      if (firstResult.status === 'DUPLICATED') {
+        msg = 'Ops! Essa nota já foi enviada antes 🤔\n\nManda outra nota fiscal pra concorrer!';
+      } else {
+        msg = '📥 *Nota recebida!*\n\nEstamos validando sua nota fiscal. Em alguns minutos te aviso aqui se sua participação foi confirmada. 🎯';
+      }
+      sendWhatsApp('whatsapp:+' + meta.wa, msg).catch(function(err) {
+        console.error('erro ao mandar wa de confirmacao imediata:', err.message);
+      });
+    }
+
     return res.status(200).json({
       status: firstResult.status,
       accessKey: firstResult.accessKey || firstResult.accesskey,
@@ -71,4 +83,33 @@ export default async function handler(req, res) {
     console.error('erro ao chamar tera:', err);
     return res.status(500).json({ error: 'erro interno', details: err.message });
   }
+}
+
+async function sendWhatsApp(to, body) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_WHATSAPP_FROM;
+
+  if (!sid || !token || !fromNumber) {
+    console.error('twilio config ausente no submit-chave');
+    return;
+  }
+
+  const url = 'https://api.twilio.com/2010-04-01/Accounts/' + sid + '/Messages.json';
+  const auth = Buffer.from(sid + ':' + token).toString('base64');
+
+  const params = new URLSearchParams();
+  params.append('From', fromNumber);
+  params.append('To', to);
+  params.append('Body', body);
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + auth,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: params.toString()
+  });
+  console.log('twilio send (submit):', resp.status);
 }

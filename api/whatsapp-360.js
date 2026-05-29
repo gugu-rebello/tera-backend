@@ -2,6 +2,7 @@
 // Formato do payload segue o padrão da Meta WhatsApp Cloud API
 
 import { processarMensagem } from '../lib/flow.js';
+import { marcarMensagemProcessada } from '../lib/store.js';
 
 export default async function handler(req, res) {
   // O 360dialog valida o webhook com um GET na configuração inicial
@@ -13,8 +14,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'method not allowed' });
   }
 
-  // Responde 200 IMEDIATAMENTE para o 360dialog não re-tentar.
-  // O processamento acontece antes do return, mas garantimos resposta rápida.
   try {
     const body = req.body || {};
     console.log('360 webhook recebido:', JSON.stringify(body).substring(0, 500));
@@ -31,6 +30,18 @@ export default async function handler(req, res) {
 
     const message = messages[0];
     const from = message.from; // número do usuário, formato 55DDDNUMERO
+    const messageId = message.id;
+
+    // Deduplicação: se essa mensagem já foi processada, ignora
+    const isNova = await marcarMensagemProcessada(messageId);
+    if (!isNova) {
+      console.log('mensagem duplicada ignorada:', messageId);
+      return res.status(200).json({ ok: true, duplicate: true });
+    }
+
+    // Nome do perfil do WhatsApp, se disponível
+    const contacts = value.contacts && value.contacts[0];
+    const nomePerfil = contacts && contacts.profile && contacts.profile.name;
 
     let textoMsg = '';
     let opcaoBotao = '';
@@ -52,7 +63,7 @@ export default async function handler(req, res) {
       textoMsg = '__IMAGE__';
     }
 
-    await processarMensagem(from, textoMsg, opcaoBotao);
+    await processarMensagem(from, textoMsg, opcaoBotao, nomePerfil);
 
     return res.status(200).json({ ok: true });
   } catch (err) {

@@ -2,7 +2,7 @@
 // Formato do payload segue o padrão da Meta WhatsApp Cloud API
 
 import { processarMensagem } from '../lib/flow.js';
-import { marcarMensagemProcessada } from '../lib/store.js';
+import { marcarMensagemProcessada, logMensagemRecebida } from '../lib/store.js';
 
 export default async function handler(req, res) {
   // O 360dialog valida o webhook com um GET na configuração inicial
@@ -32,16 +32,28 @@ export default async function handler(req, res) {
     const from = message.from; // número do usuário, formato 55DDDNUMERO
     const messageId = message.id;
 
+    // Nome do perfil do WhatsApp, se disponível
+    const contacts = value.contacts && value.contacts[0];
+    const nomePerfil = contacts && contacts.profile && contacts.profile.name;
+
+    // LOG PERSISTENTE: registra TODA mensagem que chega, antes da dedupe,
+    // para investigar mensagens inesperadas. Consultável no painel do Upstash
+    // ou via endpoint /api/ver-log.
+    await logMensagemRecebida({
+      from: from,
+      nome: nomePerfil || null,
+      tipo: message.type,
+      messageId: messageId,
+      timestampWhatsapp: message.timestamp,
+      preview: message.type === 'text' ? (message.text && message.text.body || '').substring(0, 60) : message.type
+    });
+
     // Deduplicação: se essa mensagem já foi processada, ignora
     const isNova = await marcarMensagemProcessada(messageId);
     if (!isNova) {
       console.log('mensagem duplicada ignorada:', messageId);
       return res.status(200).json({ ok: true, duplicate: true });
     }
-
-    // Nome do perfil do WhatsApp, se disponível
-    const contacts = value.contacts && value.contacts[0];
-    const nomePerfil = contacts && contacts.profile && contacts.profile.name;
 
     let textoMsg = '';
     let opcaoBotao = '';

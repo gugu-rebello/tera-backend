@@ -57,6 +57,7 @@ export default async function handler(req, res) {
 
     let textoMsg = '';
     let opcaoBotao = '';
+    let mediaId = '';
 
     if (message.type === 'text') {
       textoMsg = message.text && message.text.body;
@@ -71,11 +72,12 @@ export default async function handler(req, res) {
         textoMsg = interactive.list_reply.title;
       }
     } else if (message.type === 'image') {
-      // Foto: na fase 3 vamos processar. Por enquanto avisamos.
+      // Foto: pega o media id para baixar e processar
+      mediaId = message.image && message.image.id;
       textoMsg = '__IMAGE__';
     }
 
-    await processarMensagem(from, textoMsg, opcaoBotao, nomePerfil);
+    await processarMensagem(from, textoMsg, opcaoBotao, nomePerfil, mediaId);
 
     return res.status(200).json({ ok: true });
   } catch (err) {

@@ -1,24 +1,18 @@
+// Webhook que a Tera chama quando uma nota muda de status.
+// Quando a nota fica OK, consulta os dados completos e avisa o usuário no WhatsApp
+// com estabelecimento, qtd de itens, valor total e contador de notas do mês.
+
+import { sendText } from '../lib/whatsapp.js';
+import { registrarNota, contarNotasMes } from '../lib/store.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'method not allowed' });
   }
 
   const expectedToken = (process.env.TERA_WEBHOOK_TOKEN || '').trim();
-
   const authHeader = req.headers['authentication'] || req.headers['authorization'] || '';
   const sentToken = authHeader.replace(/^Bearer\s+/i, '').trim();
-
-  console.log('webhook tera headers:', JSON.stringify({
-    hasExpectedToken: !!expectedToken,
-    expectedTokenLength: expectedToken.length,
-    expectedTokenFirst: expectedToken.substring(0, 4),
-    expectedTokenLast: expectedToken.substring(expectedToken.length - 4),
-    receivedAuthHeader: authHeader ? authHeader.substring(0, 20) + '...' : '(empty)',
-    sentTokenLength: sentToken.length,
-    sentTokenFirst: sentToken.substring(0, 4),
-    sentTokenLast: sentToken.substring(sentToken.length - 4),
-    match: sentToken === expectedToken
-  }));
 
   if (expectedToken && sentToken !== expectedToken) {
     console.warn('webhook tera com token invalido');
@@ -43,16 +37,15 @@ export default async function handler(req, res) {
 }
 
 async function consultarEAvisar(accessKey) {
-  const teraToken = process.env.TERA_API_TOKEN;
+  const teraToken = (process.env.TERA_API_TOKEN || '').trim().replace(/^Bearer\s+/i, '');
   if (!teraToken) {
     console.error('TERA_API_TOKEN ausente');
     return;
   }
 
   try {
-    const cleanToken = teraToken.trim().replace(/^Bearer\s+/i, '');
     const teraResp = await fetch('https://api.terabr.com/v1/receipt/' + accessKey, {
-      headers: { 'Authorization': 'Bearer ' + cleanToken }
+      headers: { 'Authorization': 'Bearer ' + teraToken }
     });
     const data = await teraResp.json();
 
@@ -63,55 +56,43 @@ async function consultarEAvisar(accessKey) {
 
     const wa = data.meta.wa;
     const receipt = data.receipt || {};
-    const empresa = receipt.companyTradeName || receipt.companyName || 'estabelecimento';
-    const valor = receipt.totalValue ? receipt.totalValue.toFixed(2).replace('.', ',') : null;
+    const empresa = receipt.companyTradeName || receipt.companyName || null;
+    const valor = (typeof receipt.totalValue === 'number')
+      ? receipt.totalValue.toFixed(2).replace('.', ',')
+      : null;
+    const qtdItens = Array.isArray(receipt.items) ? receipt.items.length : null;
 
-    let msg = '✅ *Sua participação foi confirmada!*\n\n';
-    msg += 'Nota validada com sucesso 🎉\n\n';
-    if (empresa && empresa !== 'estabelecimento') {
+    // Registra a nota no contador do mês (dedupe por chave dentro do set)
+    const totalMes = await registrarNota(wa, accessKey);
+
+    // Monta a confirmação rica
+    let msg = '✅ *Participação confirmada!*\n\n';
+    if (empresa) {
       msg += '🏪 ' + empresa + '\n';
+    }
+    if (qtdItens !== null) {
+      msg += '🛒 ' + qtdItens + (qtdItens === 1 ? ' item' : ' itens') + '\n';
     }
     if (valor) {
       msg += '💰 R$ ' + valor + '\n';
     }
-    msg += '\nObrigado por participar da promoção!';
 
-    await sendWhatsApp('whatsapp:+' + wa, msg);
+    if (totalMes && totalMes > 0) {
+      const mesNome = nomeMesAtual();
+      msg += '\n📊 Você já enviou *' + totalMes + (totalMes === 1 ? ' nota' : ' notas') + '* em ' + mesNome + '!';
+    }
+
+    msg += '\n\nContinue participando! 🎯';
+
+    await sendText(wa, msg);
 
   } catch (err) {
     console.error('erro ao consultar nota:', err.message);
   }
 }
 
-async function sendWhatsApp(to, body) {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const fromNumber = process.env.TWILIO_WHATSAPP_FROM;
-
-  if (!sid || !token || !fromNumber) {
-    console.error('twilio config ausente');
-    return;
-  }
-
-  const url = 'https://api.twilio.com/2010-04-01/Accounts/' + sid + '/Messages.json';
-  const auth = Buffer.from(sid + ':' + token).toString('base64');
-
-  const params = new URLSearchParams();
-  params.append('From', fromNumber);
-  params.append('To', to);
-  params.append('Body', body);
-
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + auth,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString()
-    });
-    console.log('twilio send:', resp.status);
-  } catch (err) {
-    console.error('erro twilio:', err.message);
-  }
+function nomeMesAtual() {
+  const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  return meses[new Date().getMonth()];
 }

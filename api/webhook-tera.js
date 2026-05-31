@@ -1,9 +1,10 @@
 // Webhook que a Tera chama quando uma nota muda de status.
-// Quando a nota fica OK, consulta os dados completos e avisa o usuário no WhatsApp
-// com estabelecimento, qtd de itens, valor total e contador de notas do mês.
+// Quando a nota fica OK, busca os dados, descobre o dono (meta.wa ou associação no KV)
+// e envia a confirmação rica com itens, valor e contador.
 
-import { sendText } from '../lib/whatsapp.js';
-import { registrarNota, contarNotasMes } from '../lib/store.js';
+import { buscarDadosNota } from '../lib/nota.js';
+import { confirmarNotaComDados } from '../lib/confirmacao.js';
+import { buscarTelefonePorChave } from '../lib/store.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
     const status = eventData && eventData.status;
 
     if (status === 'OK' && accessKey) {
-      await consultarEAvisar(accessKey);
+      await processarNotaPronta(accessKey);
     } else if (status === 'INVALID') {
       console.log('nota invalida:', accessKey);
     }
@@ -36,63 +37,26 @@ export default async function handler(req, res) {
   return res.status(200).json({ received: true });
 }
 
-async function consultarEAvisar(accessKey) {
-  const teraToken = (process.env.TERA_API_TOKEN || '').trim().replace(/^Bearer\s+/i, '');
-  if (!teraToken) {
-    console.error('TERA_API_TOKEN ausente');
+async function processarNotaPronta(accessKey) {
+  // Busca os dados completos da nota
+  const dados = await buscarDadosNota(accessKey);
+  if (!dados.ok) {
+    console.log('nao consegui buscar dados da nota:', accessKey);
     return;
   }
 
-  try {
-    const teraResp = await fetch('https://api.terabr.com/v1/receipt/' + accessKey, {
-      headers: { 'Authorization': 'Bearer ' + teraToken }
-    });
-    const data = await teraResp.json();
-
-    if (data.status !== 'OK' || !data.meta || !data.meta.wa) {
-      console.log('nota sem wa no meta, ignora:', accessKey);
-      return;
-    }
-
-    const wa = data.meta.wa;
-    const receipt = data.receipt || {};
-    const empresa = receipt.companyTradeName || receipt.companyName || null;
-    const valor = (typeof receipt.totalValue === 'number')
-      ? receipt.totalValue.toFixed(2).replace('.', ',')
-      : null;
-    const qtdItens = Array.isArray(receipt.items) ? receipt.items.length : null;
-
-    // Registra a nota no contador do mês (dedupe por chave dentro do set)
-    const totalMes = await registrarNota(wa, accessKey);
-
-    // Monta a confirmação rica
-    let msg = '✅ *Participação confirmada!*\n\n';
-    if (empresa) {
-      msg += '🏪 ' + empresa + '\n';
-    }
-    if (qtdItens !== null) {
-      msg += '🛒 ' + qtdItens + (qtdItens === 1 ? ' item' : ' itens') + '\n';
-    }
-    if (valor) {
-      msg += '💰 R$ ' + valor + '\n';
-    }
-
-    if (totalMes && totalMes > 0) {
-      const mesNome = nomeMesAtual();
-      msg += '\n📊 Você já enviou *' + totalMes + (totalMes === 1 ? ' nota' : ' notas') + '* em ' + mesNome + '!';
-    }
-
-    msg += '\n\nContinue participando! 🎯';
-
-    await sendText(wa, msg);
-
-  } catch (err) {
-    console.error('erro ao consultar nota:', err.message);
+  // Descobre o dono: 1º o meta.wa (caminhos digitar/portal),
+  // 2º a associação chave->telefone no KV (caso da foto, meta vem null)
+  let phone = dados.metaWa;
+  if (!phone) {
+    phone = await buscarTelefonePorChave(accessKey);
   }
-}
 
-function nomeMesAtual() {
-  const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  return meses[new Date().getMonth()];
+  if (!phone) {
+    console.log('nota sem dono identificavel (sem meta.wa e sem associacao no KV):', accessKey);
+    return;
+  }
+
+  // Registra no contador e envia a confirmação rica
+  await confirmarNotaComDados(phone, accessKey, dados);
 }

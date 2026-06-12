@@ -26,7 +26,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 - `lib/store.js`: todas as operações KV (esquema de chaves documentado no cabeçalho de cada função).
 - `lib/whatsapp.js`: sendText / sendButtons (trunca títulos em 20 chars, limite Meta).
 - `lib/nota.js`: isValidChave (DV módulo 11) / submeterChave (com meta {wa, email, nome}) / buscarDadosNota.
-- `lib/imagem.js`: download de foto (2 passos 360dialog com reescrita de host) + OCR Tera + polling 28s.
+- `lib/imagem.js`: download de foto (2 passos 360dialog com reescrita de host) + OCR Tera + polling 28s. Envia `meta {wa, email, nome}` e `reprocess=false` no form-data: desde 06/2026 a API de imagem tem paridade de parâmetros com o POST /qr-code, e o webhook acha o dono da foto por `meta.wa` (o `chaveWa:` no KV é fallback).
 - `lib/confirmacao.js`: confirmação rica + contador mensal (compartilhada).
 - `lib/alerta.js`: alerta de lead (WhatsApp individual + email; API não manda para grupos).
 

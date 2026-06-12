@@ -22,8 +22,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 - `api/webhook-tera.js`: a Tera avisa nota processada (`RECEIPT_STATUS_UPDATED`). Busca dados, acha o dono (meta.wa OU KV `chaveWa:`), envia confirmação rica.
 - `api/submit-chave.js`: endpoint do portal web (CORS aberto).
 - `api/ver-log.js`: auditoria de mensagens (`?s={LOG_VIEW_SECRET}&n=200`).
-- `api/whatsapp-webhook.js`: LEGADO Twilio. Não usar. Deletar na limpeza.
-- `lib/flow.js`: state machine. Estados: novo, aguardando_menu_inicial, lead_contato, cadastro_email, aguardando_nota, concluido. Saudações reiniciam de qualquer estado.
+- `lib/flow.js`: state machine. Estados: novo, aguardando_menu_inicial, lead_contato, cadastro_email, aguardando_nota, concluido. A identidade vem do cadastro permanente (`usuario:{phone}`), não da sessão de 24h: cadastrado que manda nota processa direto em qualquer estado e saudação dá boas-vindas de volta; menu só com pedido explícito (menu, voltar, tera, atendente...). Novato que manda nota antes do cadastro tem a nota guardada em `notaPendente` e processada após informar o e-mail.
 - `lib/store.js`: todas as operações KV (esquema de chaves documentado no cabeçalho de cada função).
 - `lib/whatsapp.js`: sendText / sendButtons (trunca títulos em 20 chars, limite Meta).
 - `lib/nota.js`: isValidChave (DV módulo 11) / submeterChave (com meta {wa, email, nome}) / buscarDadosNota.
@@ -43,6 +42,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 8. **maxDuration 30** em `vercel.json` para `whatsapp-360.js` (polling do OCR precisa).
 9. **Não mexer no leitor de QR do portal** (`qrtera-demo/index.html`) sem teste incremental em iPhone real: BarcodeDetector e videoConstraints quebraram o Safari e foram revertidos.
 10. **Conta Twilio não pode ser cancelada** (SendGrid depende dela).
+11. **Cadastrado nunca refaz o funil.** A identidade é o cadastro permanente (`usuario:{phone}`); sessão expirada não pode mandar quem já tem e-mail de volta ao menu ou ao cadastro. Nota de cadastrado processa direto; menu só com pedido explícito.
 
 ## Convenções do projeto
 

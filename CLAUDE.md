@@ -22,6 +22,8 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 - `api/webhook-tera.js`: a Tera avisa nota processada (`RECEIPT_STATUS_UPDATED`). Busca dados, acha o dono (meta.wa OU KV `chaveWa:`), envia confirmação rica.
 - `api/submit-chave.js`: endpoint do portal web (CORS aberto).
 - `api/ver-log.js`: auditoria de mensagens (`?s={LOG_VIEW_SECRET}&n=200`).
+- `api/fila-alertas.js`: fila de alertas internos (`?s={ALERTAS_SECRET}`). Consumida pela ponte do Tiago Lins (Baileys, máquina do escritório), que posta no grupo Comercial. FIFO via Redis `fila:alertas`.
+- `api/resumo-dia.js`: status diário de notas por contato (cron Vercel 21:00 UTC = 18:00 SP; auth por `CRON_SECRET` no header ou `?s={ALERTAS_SECRET}`). Lê `alertaDia:{dia SP}` e enfileira o resumo.
 - `lib/flow.js`: state machine. Estados: novo, aguardando_menu_inicial, lead_contato, cadastro_email, aguardando_nota, concluido. A identidade vem do cadastro permanente (`usuario:{phone}`), não da sessão de 24h: cadastrado que manda nota processa direto em qualquer estado e saudação dá boas-vindas de volta; menu só com pedido explícito (menu, voltar, tera, atendente...). Novato que manda nota antes do cadastro tem a nota guardada em `notaPendente` e processada após informar o e-mail.
 - `lib/store.js`: todas as operações KV (esquema de chaves documentado no cabeçalho de cada função).
 - `lib/whatsapp.js`: sendText / sendButtons (trunca títulos em 20 chars, limite Meta).
@@ -29,6 +31,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 - `lib/imagem.js`: download de foto (2 passos 360dialog com reescrita de host) + OCR Tera + polling 28s. Envia `meta {wa, email, nome}` e `reprocess=false` no form-data: desde 06/2026 a API de imagem tem paridade de parâmetros com o POST /qr-code, e o webhook acha o dono da foto por `meta.wa` (o `chaveWa:` no KV é fallback).
 - `lib/confirmacao.js`: confirmação rica + contador mensal (compartilhada).
 - `lib/alerta.js`: alerta de lead (WhatsApp individual + email; API não manda para grupos).
+- Alertas internos (cadastro novo + status diário) NÃO usam a API oficial: vão pela fila `fila:alertas` no Redis, consumida pela ponte Baileys. Motivo: API oficial não manda para grupo e exige janela de 24h para mensagem livre.
 
 ## Invariantes que NÃO podem ser quebradas
 

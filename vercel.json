@@ -4,5 +4,11 @@
     "api/whatsapp-360.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/resumo-dia",
+      "schedule": "0 21 * * *"
+    }
+  ]
 }

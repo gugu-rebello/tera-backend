@@ -28,7 +28,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 - `lib/store.js`: todas as operações KV (esquema de chaves documentado no cabeçalho de cada função).
 - `lib/whatsapp.js`: sendText / sendButtons (trunca títulos em 20 chars, limite Meta).
 - `lib/nota.js`: isValidChave (DV módulo 11) / submeterChave (com meta {wa, email, nome}) / buscarDadosNota.
-- `lib/imagem.js`: download de foto (2 passos 360dialog com reescrita de host) + OCR Tera + polling 28s. Envia `meta {wa, email, nome}` e `reprocess=false` no form-data: desde 06/2026 a API de imagem tem paridade de parâmetros com o POST /qr-code, e o webhook acha o dono da foto por `meta.wa` (o `chaveWa:` no KV é fallback).
+- `lib/imagem.js`: download de foto (2 passos 360dialog com reescrita de host) + OCR Tera + polling 45s. Envia `meta {wa, email, nome}` e `reprocess=false` no form-data: desde 06/2026 a API de imagem tem paridade de parâmetros com o POST /qr-code, e o webhook acha o dono da foto por `meta.wa` (o `chaveWa:` no KV é fallback).
 - `lib/confirmacao.js`: confirmação rica + contador mensal (compartilhada).
 - `lib/alerta.js`: alerta de lead (WhatsApp individual + email; API não manda para grupos).
 - Alertas internos (cadastro novo + status diário) NÃO usam a API oficial: vão pela fila `fila:alertas` no Redis, drenada por um carteiro cliente (`alertas-poller.mjs`) que chama o `/send` da ponte Baileys. Motivo: API oficial não manda para grupo e exige janela de 24h para mensagem livre.
@@ -42,7 +42,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 5. **Títulos de botão ≤ 20 caracteres** (erro Meta 131009).
 6. **Webhooks sempre respondem 200**, mesmo em erro interno (evita loop de retry do provedor).
 7. **Mídia do WhatsApp:** baixar reescrevendo o host da url da Meta para `waba-v2.360dialog.io` (direto dá 401).
-8. **maxDuration 30** em `vercel.json` para `whatsapp-360.js` (polling do OCR precisa).
+8. **maxDuration 60** em `vercel.json` para `whatsapp-360.js` (polling do OCR vai até 45s; precisa de folga para download + POST + envios). Confirmar que o plano Vercel aceita 60s; se reclamar no deploy, reduzir polling e maxDuration juntos.
 9. **Não mexer no leitor de QR do portal** (`qrtera-demo/index.html`) sem teste incremental em iPhone real: BarcodeDetector e videoConstraints quebraram o Safari e foram revertidos.
 10. **Conta Twilio não pode ser cancelada** (SendGrid depende dela).
 11. **Cadastrado nunca refaz o funil.** A identidade é o cadastro permanente (`usuario:{phone}`); sessão expirada não pode mandar quem já tem e-mail de volta ao menu ou ao cadastro. Nota de cadastrado processa direto; menu só com pedido explícito.

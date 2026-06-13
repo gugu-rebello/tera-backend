@@ -65,6 +65,6 @@ Push no GitHub (`gugu-rebello/tera-backend`) → deploy automático no Vercel. E
 
 ## Estado atual e próximos passos
 
-- Fase 1 e 2 entregues (menu, lead, cadastro, 3 caminhos de nota, 2 camadas de duplicidade, confirmação rica, contador).
-- Em validação: foto end-to-end pós-correções; aceitação do maxDuration 30.
+- Fase 1 e 2 entregues e validadas end-to-end em 12/06/2026 (menu, lead, cadastro, 3 caminhos de nota, 2 camadas de duplicidade, confirmação rica, contador, usuário recorrente sem refazer o funil, meta no caminho da foto, maxDuration 30 aceito).
+- Em curso: monitoramento de mensagens fantasma via ver-log (Coexistence).
 - Fase 3 desenhada (agente IA híbrido com tool use via API Anthropic, protótipo isolado primeiro): ver `tera/projects/chatbot-whatsapp/09_roadmap.md` (second-brain).

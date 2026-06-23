@@ -2,6 +2,7 @@
 // Recebe a chave/url + meta {wa, email, nome}, submete na Tera e confirma no WhatsApp via 360dialog.
 
 import { sendText } from '../lib/whatsapp.js';
+import { msgNotaNaFila } from '../lib/mensagens.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -61,11 +62,12 @@ export default async function handler(req, res) {
 
     // Confirmação imediata no WhatsApp (via 360dialog) se veio o número
     if (meta && meta.wa && (firstResult.status === 'RECEIVED' || firstResult.status === 'DUPLICATED')) {
+      const chaveLida = firstResult.accessKey || firstResult.accesskey || chaveAcesso;
       let msg;
       if (firstResult.status === 'DUPLICATED') {
         msg = '🔁 Essa nota já tinha sido enviada antes!\n\nManda outra nota fiscal para continuar participando. 🎯';
       } else {
-        msg = '📥 *Nota recebida!*\n\nEstamos validando sua nota fiscal. Em alguns minutos te aviso aqui se sua participação foi confirmada. 🎯';
+        msg = msgNotaNaFila(chaveLida);
       }
       try {
         await sendText(meta.wa, msg);

@@ -28,7 +28,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 - `lib/mensagens.js`: copys compartilhadas (`msgNotaNaFila`, `msgNotaJaNoSistema`, `formatarChave`, `linhaChave`). Usadas por `flow.js` e `submit-chave.js` para a mensagem ser igual nos 3 caminhos (foto, digitação, portal). Ajustar a copy de "nota recebida" aqui, num lugar só.
 - `lib/store.js`: todas as operações KV (esquema de chaves documentado no cabeçalho de cada função).
 - `lib/whatsapp.js`: sendText / sendButtons (trunca títulos em 20 chars, limite Meta).
-- `lib/nota.js`: isValidChave (DV módulo 11) / submeterChave (com meta {wa, email, nome}) / buscarDadosNota.
+- `lib/nota.js`: isValidChave (DV módulo 11) / submeterChave (com meta {wa, email, nome}) / buscarDadosNota. `isValidChave` aceita chave NUMÉRICA e a nova com CNPJ ALFANUMÉRICO (letras no 7º-20º): DV via `valorChar` (ASCII − 48), retrocompatível. `extrairChave` (flow.js) reconhece a chave alfanumérica digitada (regex `\d{6}[0-9A-Z]{12}\d{26}`, estrutura da chave). Vale só para DIGITAÇÃO; câmera/QR e OCR de foto ainda são numérico-only.
 - `lib/imagem.js`: download de foto (2 passos 360dialog com reescrita de host) + OCR Tera + polling 45s. Envia `meta {wa, email, nome}` e `reprocess=false` no form-data: desde 06/2026 a API de imagem tem paridade de parâmetros com o POST /qr-code, e o webhook acha o dono da foto por `meta.wa` (o `chaveWa:` no KV é fallback).
 - `lib/confirmacao.js`: confirmação rica + contador mensal (compartilhada).
 - `lib/alerta.js`: alerta de lead (WhatsApp individual + email; API não manda para grupos).

@@ -20,11 +20,12 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 
 - `api/whatsapp-360.js`: webhook do 360dialog. TODA mensagem entra aqui. Dedupe por messageId + log persistente, depois delega para `lib/flow.js`.
 - `api/webhook-tera.js`: a Tera avisa nota processada (`RECEIPT_STATUS_UPDATED`). Busca dados, acha o dono (meta.wa OU KV `chaveWa:`), envia confirmação rica.
-- `api/submit-chave.js`: endpoint do portal web (CORS aberto).
+- `api/submit-chave.js`: endpoint do portal web (CORS aberto). Confirma no WhatsApp com `msgNotaNaFila` (de `lib/mensagens.js`), mesma copy do fluxo da foto/digitação.
 - `api/ver-log.js`: auditoria de mensagens (`?s={LOG_VIEW_SECRET}&n=200`).
 - `api/fila-alertas.js`: fila de alertas internos (`?s={ALERTAS_SECRET}`). Consumida por um carteiro (`alertas-poller.mjs`, no second-brain `tera/tools/whatsapp-bridge/`) que roda na máquina da ponte e posta no grupo Comercial via o `/send` da ponte Baileys. NÃO está embutido no `bridge.js`. FIFO via Redis `fila:alertas`.
 - `api/resumo-dia.js`: status diário de notas por contato (cron Vercel 21:00 UTC = 18:00 SP; auth por `CRON_SECRET` no header ou `?s={ALERTAS_SECRET}`). Lê `alertaDia:{dia SP}` e enfileira o resumo.
 - `lib/flow.js`: state machine. Estados: novo, aguardando_menu_inicial, lead_contato, cadastro_email, aguardando_nota, concluido. A identidade vem do cadastro permanente (`usuario:{phone}`), não da sessão de 24h: cadastrado que manda nota processa direto em qualquer estado e saudação dá boas-vindas de volta; menu só com pedido explícito (menu, voltar, tera, atendente...). Novato que manda nota antes do cadastro tem a nota guardada em `notaPendente` e processada após informar o e-mail. O `nomePerfil` (vem em TODA mensagem) faz backfill do `usuario.nome` no início de `processarMensagem`: cadastros antigos sem nome se corrigem na próxima mensagem, e o meta da foto (que lê o nome gravado) passa a ter o nome.
+- `lib/mensagens.js`: copys compartilhadas (`msgNotaNaFila`, `msgNotaJaNoSistema`, `formatarChave`, `linhaChave`). Usadas por `flow.js` e `submit-chave.js` para a mensagem ser igual nos 3 caminhos (foto, digitação, portal). Ajustar a copy de "nota recebida" aqui, num lugar só.
 - `lib/store.js`: todas as operações KV (esquema de chaves documentado no cabeçalho de cada função).
 - `lib/whatsapp.js`: sendText / sendButtons (trunca títulos em 20 chars, limite Meta).
 - `lib/nota.js`: isValidChave (DV módulo 11) / submeterChave (com meta {wa, email, nome}) / buscarDadosNota.
@@ -46,6 +47,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 9. **Não mexer no leitor de QR do portal** (`qrtera-demo/index.html`) sem teste incremental em iPhone real: BarcodeDetector e videoConstraints quebraram o Safari e foram revertidos.
 10. **Conta Twilio não pode ser cancelada** (SendGrid depende dela).
 11. **Cadastrado nunca refaz o funil.** A identidade é o cadastro permanente (`usuario:{phone}`); sessão expirada não pode mandar quem já tem e-mail de volta ao menu ou ao cadastro. Nota de cadastrado processa direto; menu só com pedido explícito.
+12. **TIMEOUT do OCR ≠ foto ruim.** Se o polling estoura (foto sem retorno em 45s), é "ainda processando", não falha de leitura: mandar `msgProcessando` ("estou processando, te aviso aqui", com atalhos opcionais), NUNCA "não consegui ler". O "não consegui ler / foto ruim" (`msgFotoNaoLida`) é só para `INVALID/ERROR`. Caso real (13/06): foto deu TIMEOUT, confirmou sozinha 15 min depois via webhook + `meta.wa`. Risco aberto: se a nota der TIMEOUT e depois falhar (INVALID) no backend da Tera, o webhook só loga e o usuário fica sem fechamento (alinhar com o Paixão se INVALID dispara webhook/aviso).
 
 ## Convenções do projeto
 

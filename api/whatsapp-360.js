@@ -3,6 +3,7 @@
 
 import { processarMensagem } from '../lib/flow.js';
 import { marcarMensagemProcessada, logMensagemRecebida } from '../lib/store.js';
+import { reconciliarFotos } from '../lib/reconciliacao.js';
 
 export default async function handler(req, res) {
   // O 360dialog valida o webhook com um GET na configuração inicial
@@ -78,6 +79,10 @@ export default async function handler(req, res) {
     }
 
     await processarMensagem(from, textoMsg, opcaoBotao, nomePerfil, mediaId);
+
+    // Piggyback: aproveita cada mensagem para fechar o loop das fotos que deram TIMEOUT
+    // (confirmar via webhook ou avisar que não deu). Nunca derruba o fluxo principal.
+    try { await reconciliarFotos(); } catch (e) { console.error('reconciliarFotos:', e.message); }
 
     return res.status(200).json({ ok: true });
   } catch (err) {

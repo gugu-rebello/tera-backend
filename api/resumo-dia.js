@@ -1,8 +1,10 @@
-// Status diário do teste de leitura: quantidade de notas por contato no dia (fuso SP),
+// Status do teste de leitura: envios e confirmações por contato nas ÚLTIMAS 24H,
 // enfileirado para a ponte postar no grupo Comercial.
-// Disparo: cron do Vercel (Authorization: Bearer {CRON_SECRET}) ou manual com ?s={ALERTAS_SECRET}.
+// Janela deslizante de 24h (não dia calendário): roda no horário fixo do cron e cobre a
+// noite anterior, sem depender do dedupe mensal. Disparo: cron do Vercel
+// (Authorization: Bearer {CRON_SECRET}) ou manual com ?s={ALERTAS_SECRET}.
 
-import { lerNotasDoDia, enfileirarAlerta, getUser } from '../lib/store.js';
+import { lerResumo24h, enfileirarAlerta, getUser } from '../lib/store.js';
 
 export default async function handler(req, res) {
   const alertasSecret = (process.env.ALERTAS_SECRET || '').trim();
@@ -13,32 +15,37 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  const contagens = await lerNotasDoDia();
-  const phones = Object.keys(contagens || {});
-  const dataSP = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const resumo = await lerResumo24h();
+  const phones = Object.keys(resumo || {});
 
-  let msg = '📊 *Status do dia ' + dataSP + ' - Teste de leitura*\n\n';
+  let msg = '📊 *Status (últimas 24h) - Teste de leitura*\n\n';
 
   if (phones.length === 0) {
-    msg += 'Nenhuma nota enviada hoje.';
+    msg += 'Nenhuma nota enviada nas últimas 24h.';
   } else {
-    // Ordena do maior volume para o menor (abuso aparece no topo)
-    phones.sort(function (a, b) { return (contagens[b] || 0) - (contagens[a] || 0); });
+    // Ordena por envios (maior volume no topo, para abuso aparecer primeiro)
+    phones.sort(function (a, b) { return (resumo[b].enviadas || 0) - (resumo[a].enviadas || 0); });
 
-    let totalNotas = 0;
+    let totalEnviadas = 0;
+    let totalConfirmadas = 0;
     const linhas = [];
     for (const phone of phones) {
-      const qtd = parseInt(contagens[phone], 10) || 0;
-      totalNotas += qtd;
+      const enviadas = resumo[phone].enviadas || 0;
+      const confirmadas = resumo[phone].confirmadas || 0;
+      totalEnviadas += enviadas;
+      totalConfirmadas += confirmadas;
       const user = await getUser(phone);
       const nome = (user && user.nome) || '(sem nome)';
       const email = (user && user.email) || '(sem e-mail)';
-      const aviso = qtd >= 10 ? ' ⚠️ volume alto' : '';
-      linhas.push('• ' + nome + ' (' + phone + ', ' + email + '): ' + qtd + (qtd === 1 ? ' nota' : ' notas') + aviso);
+      const aviso = enviadas >= 10 ? ' ⚠️ volume alto' : '';
+      linhas.push('• ' + nome + ' (' + phone + ', ' + email + '): ' +
+        enviadas + (enviadas === 1 ? ' enviada' : ' enviadas') + ', ' +
+        confirmadas + (confirmadas === 1 ? ' confirmada' : ' confirmadas') + aviso);
     }
 
-    msg += phones.length + (phones.length === 1 ? ' contato mandou ' : ' contatos mandaram ') +
-      totalNotas + (totalNotas === 1 ? ' nota' : ' notas') + ' hoje:\n\n' + linhas.join('\n');
+    msg += phones.length + (phones.length === 1 ? ' contato' : ' contatos') +
+      ' · *' + totalEnviadas + '* enviadas / *' + totalConfirmadas + '* confirmadas:\n\n' +
+      linhas.join('\n');
   }
 
   await enfileirarAlerta(msg);

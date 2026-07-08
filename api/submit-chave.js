@@ -3,6 +3,7 @@
 
 import { sendText } from '../lib/whatsapp.js';
 import { msgNotaNaFila } from '../lib/mensagens.js';
+import { registrarEnvio } from '../lib/store.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -33,6 +34,11 @@ export default async function handler(req, res) {
   const qrCodeEntry = { url: urlToSend };
   if (meta && typeof meta === 'object') {
     qrCodeEntry.meta = meta;
+  }
+
+  // Conta o envio pelo portal (acompanhamento do time, janela de 24h).
+  if (meta && meta.wa) {
+    await registrarEnvio(meta.wa);
   }
 
   try {

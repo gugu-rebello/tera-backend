@@ -71,7 +71,10 @@ export default async function handler(req, res) {
       const chaveLida = firstResult.accessKey || firstResult.accesskey || chaveAcesso;
       let msg;
       if (firstResult.status === 'DUPLICATED') {
-        msg = '🔁 Essa nota já tinha sido enviada antes!\n\nManda outra nota fiscal para continuar participando. 🎯';
+        // Já existe na Tera (pode ter vindo de uma foto sua que ainda está processando, ex.:
+        // nota em contingência). NÃO dizer "manda outra": a nota pode estar só em processamento
+        // e vai confirmar. Tranquiliza e não pede reenvio.
+        msg = '🔁 *Essa nota já está no nosso sistema.*\n\nSe você ainda não recebeu a confirmação, é só aguardar: ela chega aqui assim que terminar de processar. Não precisa reenviar. 🎯';
       } else {
         msg = msgNotaNaFila(chaveLida);
       }

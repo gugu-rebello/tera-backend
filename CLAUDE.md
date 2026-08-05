@@ -55,6 +55,7 @@ Chatbot de WhatsApp da Tera para promoções com nota fiscal. O usuário envia n
 
 - Comentários e mensagens de usuário em pt-BR. "Tera" sempre com T maiúsculo.
 - Sem travessões em copys (padrão editorial Tera): usar vírgulas, dois pontos ou parênteses.
+- **A chave de acesso fica ACIMA do QR code** na nota (junto do "Consulte pela chave de acesso em..."), NÃO embaixo. Toda copy que indicar onde estão os 44 números deve dizer "logo acima do QR code".
 - Funções de banco nunca lançam: try/catch com fallback que não derruba o fluxo.
 - Logs de integração com prefixo identificável (`360dialog send:`, `tera imagem POST:`, `webhook tera:`...).
 - Toda mudança de comportamento testável localmente antes do push (sintaxe: `node --input-type=module --check < arquivo`).
